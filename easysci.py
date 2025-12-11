@@ -1,0 +1,127 @@
+#############################################
+########## 1. Import Libraries
+#############################################
+import os
+import sys
+import argparse
+
+# Custom
+sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
+from scripts import barcode, tag, index, count, merge
+# from scripts import count, index
+
+#############################################
+########## 2. Argument parser
+#############################################
+
+def run():
+    
+    # Initialize parsers
+    parser = argparse.ArgumentParser(description='Main script with subcommands')
+    subparsers = parser.add_subparsers(dest='command', help='Available subcommands')
+
+    # 1. Subparser for barcoding
+    barcode_parser = subparsers.add_parser('barcode', help='Barcode EasySci reads for paired-end sequencing.')
+    barcode_parser.add_argument("--ligation_barcode_read_file", type=str, required=True, help="File path for the ligation barcode read file.")
+    barcode_parser.add_argument("--umi_cell_barcode_read_file", type=str, required=True, help="File path for the UMI and cell barcode + biological read file.")
+    barcode_parser.add_argument("--biological_read_file", type=str, required=True, help="File path for the biological read file.")
+    barcode_parser.add_argument("--output_basename", type=str, required=True, help="Basename for output files; barcoded R1 and R2 outputs will be generated based on this name.")
+    barcode_parser.add_argument("--ligation_barcode_file", type=str, required=True, help="File path containing ligation barcodes.")
+    barcode_parser.add_argument("--RT_barcode_file", type=str, required=True, help="File path containing RT barcodes.")
+    barcode_parser.add_argument("--randomN_barcode_file", type=str, required=True, help="File path containing randomN barcodes.")
+
+    # 2. Subparser for BAM tagging
+    tagging_parser = subparsers.add_parser('tag', help="Add CB and UB tags from read name to a BAM file.")
+    tagging_parser.add_argument("--input_file", type=str, required=True, help="Input BAM file.")
+    tagging_parser.add_argument("--output_file", type=str, required=True, help="Output BAM file.")
+    tagging_parser.add_argument("--num_processes", type=int, default=1, help="Number of processes to use.")    
+
+    # 3. Subparser for index creation
+    index_parser = subparsers.add_parser('index', help='Create a genome index for rapid counting.')
+    index_parser.add_argument("--input_gtf", type=str, required=True, help="Input GTF file.")
+    index_parser.add_argument("--output_file", type=str, required=True, help="Output file.")
+
+    # 4. Subparser for counting
+    count_parser = subparsers.add_parser('count', help='Count reads from a BAM file.')
+    count_parser.add_argument("--input_bam", type=str, required=True, help="Input BAM file.")
+    count_parser.add_argument("--index_file", type=str, required=True, help="EasySci index file. If unstranded, use the unstranded index.")
+    count_parser.add_argument("--output_dir", type=str, required=True, help="Output basename.")
+    count_parser.add_argument("--sample_name", type=str, required=True, help="Sample name for file and cell naming.")
+    count_parser.add_argument("--multigene_reads", type=str, required=False, default='discard', choices=['discard', 'closest_TES', 'uniform', 'prop_unique', 'EM'], help="How to handle reads that map to multiple genes.")
+    count_parser.add_argument("--primer_type", type=str, required=False, default='shortdT', help="Primer type used for library preparation (shortdT or randomN).")
+    count_parser.add_argument("--library_strandedness", type=str, required=False, default='reverse', choices=['reverse', 'none'], help="Strandedness of the library.")
+    count_parser.add_argument("--read_subset", type=int, required=False, default=None, help="Number of reads to subset for testing.")
+    count_parser.add_argument("--count_introns", action='store_true', help="Count introns.")
+    count_parser.add_argument("--collapse_by_gene_name", action='store_true', help="Collapse by gene name.")
+
+    # 5. Subparser for index creation
+    merge_parser = subparsers.add_parser('merge', help='Create a genome index for rapid counting.')
+    merge_parser.add_argument("--count_files", type=str, required=True, help="Input count files.")
+    merge_parser.add_argument("--output_basename", type=str, required=True, help="Output basename.")
+
+    # Get args
+    args = parser.parse_args()
+
+    if args.command == 'barcode':
+        barcode.main(args)
+    elif args.command == 'tag':
+        tag.main(args)
+    elif args.command == 'index':
+        index.main(args)
+    elif args.command == 'count':
+        count.main(args)
+    elif args.command == 'merge':
+        merge.main(args)
+    else:
+        parser.print_help()
+
+#############################################
+########## 4. Run
+#############################################
+    
+if __name__ == '__main__':
+    run()
+    
+    
+
+# # 2. Subparser for deduplication
+# deduplication_parser = subparsers.add_parser('deduplicate', help='Remove duplicates from a BAM file.')
+# deduplication_parser.add_argument("--input_bam", type=str, required=True, help="Input BAM file.")
+# deduplication_parser.add_argument("--output_bam", type=str, required=True, help="Output BAM file.")
+# deduplication_parser.add_argument("--version", type=str, required=True, help="Version of deduplication algorithm.")
+
+
+# # 3. Subparser for creating an index
+# index_parser = subparsers.add_parser('index', help='Create an EasySci index for quantification.')
+# index_parser.add_argument("--gtf_file", type=str, required=True, help="GTF file.")
+# index_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+
+# # 4. Subparser for counting
+# count_parser = subparsers.add_parser('count', help='Count reads from a BAM file.')
+# count_parser.add_argument("--input_bam", type=str, required=True, help="Input BAM file.")
+# # count_parser.add_argument("--index_dir", type=str, required=True, help="Directory of EasySci index.")
+# # count_parser.add_argument("--randomN_barcode_file", type=str, required=True, help="File path containing randomN barcodes.")
+# count_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+# count_parser.add_argument("--sample_name", type=str, required=False, help="Sample name.")
+
+
+# # 5. Subparser for count merging
+# merge_parser = subparsers.add_parser('merge', help='Merge counts from multiple replicates.')
+# merge_parser.add_argument("--input_dirs", type=str, required=True, help="Input count files.")
+# merge_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+# merge_parser.add_argument("--RT_matching_file", type=str, required=True, help="File containing RT barcode matching information.")
+# merge_parser.add_argument("--index_dir", type=str, required=True, help="Directory of EasySci index.")
+
+
+# if args.command == 'barcode':
+#     barcode.main(args)
+# elif args.command == 'deduplicate':
+#     deduplicate.main(args)
+# elif args.command == 'index':
+#     index.main(args)
+# elif args.command == 'count':
+#     count.main(args)
+# elif args.command == 'merge':
+#     merge.main(args)
+# else:
+#     parser.print_help()
