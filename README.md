@@ -14,9 +14,10 @@ This pipeline processes the sequencing data through multiple stages:
 5. **BAM filtering**
 6. **BAM tagging with cell barcodes and UMIs**
 7. **UMI deduplication**
-8. **Transcriptome index creation**
-9. **Read counting and gene assignment**
-10. **Count matrix merging across samples**
+8. **SLAM-seq nascent read filtering** (SLAM-seq experiments only)
+9. **Transcriptome index creation**
+10. **Read counting and gene assignment**
+11. **Count matrix merging across samples**
 
 ## Installation
 
@@ -122,8 +123,11 @@ STAR --runThreadN 8 \
   --readFilesCommand zcat \
   --outFileNamePrefix /path/to/aligned/sample1_ \
   --outSAMtype BAM SortedByCoordinate \
-  --outSAMattributes NH HI AS nM
+  --outSAMattributes NH HI AS nM MD
 ```
+
+> **Note (SLAM-seq only):** The `MD` attribute in `--outSAMattributes` is required for the `slam` subcommand. It encodes reference bases at each aligned position, enabling T→C detection without an external reference FASTA. If you have a BAM aligned without `MD`, add it retroactively: `samtools calmd -b input.bam reference.fa > input_with_md.bam`
+
 **Output:**
 - `sample1_Aligned.sortedByCoord.out.bam` - Aligned BAM file
 
@@ -197,7 +201,41 @@ rm /path/to/dedup/sample1_dedup_temp.bam
 **Output:**
 - `sample1_dedup.bam` - Deduplicated BAM file sorted by name
 
-### Step 7: Create Transcriptome Index
+### Step 8: SLAM-seq Nascent Read Filtering (SLAM-seq experiments only)
+
+Identify and extract reads carrying the T→C substitution signature introduced by s⁴U metabolic labeling. This step operates on the deduplicated, name-sorted BAM from Step 7 and produces a nascent-only BAM that can be passed to `count` (Step 10) separately from the total-RNA BAM.
+
+**Requires:** the `MD` BAM tag must be present (see Step 3 note).
+
+**Algorithm:** For each read with FLAG ∈ {83, 99, 147, 163}, the tool counts (1) all non-SNP mismatches above the base-quality threshold, and (2) T→C mismatches on + strand reads (FLAG 99/163) or A→G mismatches on − strand reads (FLAG 83/147 — the reverse-complement representation of T→C). If T→C mismatches / total mismatches ≥ `--min_tc_ratio`, the read's QNAME is marked nascent. In a second pass, all reads (both mates of a pair) with a nascent QNAME are written to the output BAM.
+
+**Input:**
+- `sample1_dedup.bam` — deduplicated, name-sorted BAM from Step 7
+- (Optional) background SNP VCF to suppress germline variants
+
+**Command:**
+```bash
+easysci slam \
+  --input_bam /path/to/dedup/sample1_dedup.bam \
+  --output_bam /path/to/nascent/sample1_nascent.bam \
+  --snp_vcf /path/to/ref_SNPs.vcf \
+  --min_base_quality 45 \
+  --min_tc_ratio 0.3
+```
+
+**Parameters:**
+- `--input_bam`: deduplicated, name-sorted BAM (required)
+- `--output_bam`: output path for the nascent BAM (required)
+- `--snp_vcf`: tab-separated SNP file with columns CHROM, POS (1-based), REF, ALT; lines starting with `#` are skipped. VarScan output (with `Chrom/Position/Ref/Var` header) is accepted as-is. Standard VCF: pre-process with `bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n'` (optional)
+- `--min_base_quality`: Phred quality floor (default 45, matching the Cao lab reference)
+- `--min_tc_ratio`: T→C fraction threshold (default 0.3, matching the Cao lab reference)
+- `--num_processes`: reserved for future parallelism; currently 1 process only
+
+**Output:**
+- `sample1_nascent.bam` — nascent-only BAM, name-sorted, ready for `easysci count`
+- `sample1_nascent-slam-summary.tsv` — per-category read counts (total processed, skipped by flag/MD/quality, no-mismatch reads, below-threshold reads, nascent reads classified, reads written)
+
+### Step 9: Create Transcriptome Index
 
 Generate a transcriptome annotation index for efficient read counting (only needs to be done once per transcriptome).
 
@@ -211,7 +249,7 @@ easysci index \
 **Output:**
 - `transcriptome_index.pickle` - Transcriptome annotation index
 
-### Step 8: Count Reads
+### Step 10: Count Reads
 
 Count reads and assign them to genes, generating a cell-by-gene count matrix.
 
@@ -248,7 +286,7 @@ Two TSV (tab-separated) files in the specified output directory:
 
 **Note**: Output format will be optimized in future versions.
 
-### Step 9: Merge Count Matrices (Optional)
+### Step 11: Merge Count Matrices (Optional)
 
 Merge count matrices from multiple samples or replicates into a single sparse matrix.
 
@@ -302,7 +340,7 @@ STAR --runThreadN 8 \
   --readFilesCommand zcat \
   --outFileNamePrefix output/aligned/sample1_ \
   --outSAMtype BAM SortedByCoordinate \
-  --outSAMattributes NH HI AS nM
+  --outSAMattributes NH HI AS nM MD
 
 # Step 4: Filter BAM file
 samtools view -bh -q 30 -f 2 -F 1804 -@ 32 \
@@ -330,7 +368,13 @@ samtools sort -n output/dedup/sample1_dedup_temp.bam \
   -o output/dedup/sample1_dedup.bam -@ 32 && \
 rm output/dedup/sample1_dedup_temp.bam
 
-# Step 7: Create index (once per genome)
+# Step 8: Filter nascent reads (SLAM-seq only)
+easysci slam \
+  --input_bam output/dedup/sample1_dedup.bam \
+  --output_bam output/nascent/sample1_nascent.bam \
+  --snp_vcf /path/to/ref_SNPs.vcf
+
+# Step 9: Create index (once per genome)
 easysci index \
   --input_gtf /path/to/genes.gtf \
   --output_file output/indices/transcriptome_index.pickle

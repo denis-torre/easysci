@@ -7,7 +7,7 @@ import argparse
 
 # Custom
 sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-from scripts import barcode, tag, index, count, merge
+from scripts import barcode, tag, index, count, merge, slam
 # from scripts import count, index
 
 #############################################
@@ -59,6 +59,15 @@ def run():
     merge_parser.add_argument("--count_files", type=str, required=True, help="Input count files.")
     merge_parser.add_argument("--output_basename", type=str, required=True, help="Output basename.")
 
+    # 6. Subparser for SLAM-seq nascent read filtering
+    slam_parser = subparsers.add_parser('slam', help='Filter nascent reads from a SLAM-seq BAM using the T→C substitution signature.')
+    slam_parser.add_argument("--input_bam", type=str, required=True, help="Input deduplicated, name-sorted BAM file (output of umi_tools dedup + samtools sort -n).")
+    slam_parser.add_argument("--output_bam", type=str, required=True, help="Output BAM file containing only nascent (T→C-labeled) reads.")
+    slam_parser.add_argument("--snp_vcf", type=str, required=False, default=None, help="Tab-separated file of background SNPs to exclude. Columns: CHROM(0) POS(1, 1-based) REF(2) ALT(3). Lines starting with '#' are skipped. VarScan format accepted directly; standard VCF: pre-process with 'bcftools query -f \"%%CHROM\\t%%POS\\t%%REF\\t%%ALT\\n\"'.")
+    slam_parser.add_argument("--min_base_quality", type=int, required=False, default=45, help="Minimum Phred base quality for a position to be scored (default: 45).")
+    slam_parser.add_argument("--min_tc_ratio", type=float, required=False, default=0.3, help="Minimum T→C mismatch ratio (tc_mismatches / total_mismatches) to classify a read as nascent (default: 0.3).")
+    slam_parser.add_argument("--num_processes", type=int, required=False, default=1, help="Number of processes (default: 1; parallelism not yet implemented).")
+
     # Get args
     args = parser.parse_args()
 
@@ -72,6 +81,8 @@ def run():
         count.main(args)
     elif args.command == 'merge':
         merge.main(args)
+    elif args.command == 'slam':
+        slam.main(args)
     else:
         parser.print_help()
 
