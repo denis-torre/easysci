@@ -7,7 +7,7 @@ import argparse
 
 # Custom
 sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-from scripts import barcode, tag, index, count, merge, slam
+from scripts import barcode, tag, index, count, merge, slam, gRNA
 # from scripts import count, index
 
 #############################################
@@ -68,6 +68,20 @@ def run():
     slam_parser.add_argument("--min_tc_ratio", type=float, required=False, default=0.3, help="Minimum T→C mismatch ratio (tc_mismatches / total_mismatches) to classify a read as nascent (default: 0.3).")
     slam_parser.add_argument("--num_processes", type=int, required=False, default=1, help="Number of processes (default: 1; parallelism not yet implemented).")
 
+    # 7. Subparser for gRNA counting
+    grna_parser = subparsers.add_parser('gRNA', help='Count sgRNA UMIs per cell from PerturbSci-Kinetics FASTQ files.')
+    grna_parser.add_argument("--r1", type=str, required=True, help="R1 FASTQ (UMI + RT barcode + constant region 1).")
+    grna_parser.add_argument("--r2", type=str, required=True, help="R2 FASTQ (inner i7 barcode + constant region 2 + sgRNA sequence).")
+    grna_parser.add_argument("--r3", type=str, required=True, help="R3 FASTQ (ligation barcode).")
+    grna_parser.add_argument("--ligation_barcode_file", type=str, required=True, help="TSV of ligation barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_parser.add_argument("--RT_barcode_file", type=str, required=True, help="TSV of RT barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_parser.add_argument("--inner_i7_barcode_file", type=str, required=True, help="TSV of inner i7 barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_parser.add_argument("--sgrna_barcode_file", type=str, required=True, help="TSV of sgRNA sequences (barcode_1bp_substitution / original_barcode).")
+    grna_parser.add_argument("--sgrna_annotation_file", type=str, required=True, help="TSV mapping sgRNA sequences to names (gRNA_seq / names).")
+    grna_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+    grna_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
+    grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
+
     # Get args
     args = parser.parse_args()
 
@@ -83,6 +97,8 @@ def run():
         merge.main(args)
     elif args.command == 'slam':
         slam.main(args)
+    elif args.command == 'gRNA':
+        gRNA.main(args)
     else:
         parser.print_help()
 
