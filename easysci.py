@@ -82,6 +82,20 @@ def run():
     grna_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
     grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
 
+    # 8. Subparser for gRNA counting with auto-discovery
+    grna_auto_parser = subparsers.add_parser('gRNA-auto', help='Count sgRNA UMIs per cell, discovering sgRNA sequences from the data (no reference barcode file required).')
+    grna_auto_parser.add_argument("--r1", type=str, required=True, help="R1 FASTQ (UMI + RT barcode + constant region 1).")
+    grna_auto_parser.add_argument("--r2", type=str, required=True, help="R2 FASTQ (inner i7 barcode + constant region 2 + sgRNA sequence).")
+    grna_auto_parser.add_argument("--r3", type=str, required=True, help="R3 FASTQ (ligation barcode).")
+    grna_auto_parser.add_argument("--ligation_barcode_file", type=str, required=True, help="TSV of ligation barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_auto_parser.add_argument("--RT_barcode_file", type=str, required=True, help="TSV of RT barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_auto_parser.add_argument("--inner_i7_barcode_file", type=str, required=True, help="TSV of inner i7 barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_auto_parser.add_argument("--sgrna_annotation_file", type=str, required=False, default=None, help="Optional TSV mapping sgRNA sequences to names (gRNA_seq / names). If omitted, raw sequences are used as identifiers.")
+    grna_auto_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+    grna_auto_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
+    grna_auto_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
+    grna_auto_parser.add_argument("--min_sgrna_count", type=int, required=False, default=10, help="Minimum reads a sequence must appear in (pass 1) to be whitelisted as a real sgRNA (default: 10).")
+
     # Get args
     args = parser.parse_args()
 
@@ -99,6 +113,8 @@ def run():
         slam.main(args)
     elif args.command == 'gRNA':
         gRNA.main(args)
+    elif args.command == 'gRNA-auto':
+        gRNA.main_autodiscovery(args)
     else:
         parser.print_help()
 
