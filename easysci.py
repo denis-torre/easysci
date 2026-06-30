@@ -78,7 +78,7 @@ def run():
     grna_parser.add_argument("--RT_barcode_file", type=str, required=True, help="TSV of RT barcodes (barcode_1bp_substitution / original_barcode).")
     grna_parser.add_argument("--inner_i7_barcode_file", type=str, required=True, help="TSV of inner i7 barcodes (barcode_1bp_substitution / original_barcode).")
     grna_parser.add_argument("--sgrna_barcode_file", type=str, required=True, help="TSV of sgRNA sequences (barcode_1bp_substitution / original_barcode).")
-    grna_parser.add_argument("--sgrna_annotation_file", type=str, required=True, help="TSV mapping sgRNA sequences to names (gRNA_seq / names).")
+    grna_parser.add_argument("--sgrna_annotation_file", type=str, required=False, default=None, help="Optional TSV mapping sgRNA sequences to names (gRNA_seq / names). If omitted, raw sequences are used as identifiers.")
     grna_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
     grna_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
     grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")

@@ -210,15 +210,18 @@ def _write_discovery_outputs(sgrna_seq_counts, read_counter, output_dir, sample_
 
 
 def count_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcode_file,
-                     inner_i7_barcode_file, sgrna_barcode_file, sgrna_annotation_file,
-                     output_dir, sample_name, min_umi_threshold=10, n_reads=None):
+                     inner_i7_barcode_file, sgrna_barcode_file, output_dir, sample_name,
+                     sgrna_annotation_file=None, min_umi_threshold=10, n_reads=None):
 
     print("Loading barcodes...", flush=True)
     ligation_barcodes, RT_barcodes, inner_i7_barcodes = _load_barcodes(
         ligation_barcode_file, RT_barcode_file, inner_i7_barcode_file)
     sgrna_barcodes = _load_barcode_dict(sgrna_barcode_file)
-    annot_df = pd.read_table(sgrna_annotation_file)
-    sgrna_annotation = dict(zip(annot_df['gRNA_seq'], annot_df['names']))
+
+    sgrna_annotation = {}
+    if sgrna_annotation_file:
+        annot_df = pd.read_table(sgrna_annotation_file)
+        sgrna_annotation = dict(zip(annot_df['gRNA_seq'], annot_df['names']))
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -353,7 +356,7 @@ def main(args):
         RT_barcode_file=args.RT_barcode_file,
         inner_i7_barcode_file=args.inner_i7_barcode_file,
         sgrna_barcode_file=args.sgrna_barcode_file,
-        sgrna_annotation_file=args.sgrna_annotation_file,
+        sgrna_annotation_file=getattr(args, 'sgrna_annotation_file', None),
         output_dir=args.output_dir,
         sample_name=args.sample_name,
         min_umi_threshold=args.min_umi_threshold,
