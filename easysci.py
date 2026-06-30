@@ -65,7 +65,8 @@ def run():
     slam_parser.add_argument("--output_bam", type=str, required=True, help="Output BAM file containing only nascent (T→C-labeled) reads.")
     slam_parser.add_argument("--snp_vcf", type=str, required=False, default=None, help="Tab-separated file of background SNPs to exclude. Columns: CHROM(0) POS(1, 1-based) REF(2) ALT(3). Lines starting with '#' are skipped. VarScan format accepted directly; standard VCF: pre-process with 'bcftools query -f \"%%CHROM\\t%%POS\\t%%REF\\t%%ALT\\n\"'.")
     slam_parser.add_argument("--min_base_quality", type=int, required=False, default=45, help="Minimum Phred base quality for a position to be scored (default: 45).")
-    slam_parser.add_argument("--min_tc_ratio", type=float, required=False, default=0.3, help="Minimum T→C mismatch ratio (tc_mismatches / total_mismatches) to classify a read as nascent (default: 0.3).")
+    slam_parser.add_argument("--min_tc_ratio", type=float, required=False, default=0.3, help="Minimum T→C conversion rate (tc_mismatches / total_T_positions_above_quality) to classify a read as nascent (default: 0.3).")
+    slam_parser.add_argument("--min_tc_count", type=int, required=False, default=1, help="Minimum number of T→C mismatches required to classify a read as nascent (default: 1).")
     slam_parser.add_argument("--num_processes", type=int, required=False, default=1, help="Number of processes (default: 1; parallelism not yet implemented).")
 
     # 7. Subparser for gRNA counting

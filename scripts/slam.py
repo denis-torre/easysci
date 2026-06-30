@@ -42,7 +42,7 @@ def load_snps(snp_vcf):
     return snp_set
 
 
-def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_tc_ratio, num_processes):
+def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_tc_ratio, min_tc_count, num_processes):
 
     # Parallelism stub
     if num_processes > 1:
@@ -101,7 +101,7 @@ def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_t
                 continue
 
             chrom = read.reference_name
-            total_mismatches = 0
+            total_t_positions = 0
             tc_mismatches = 0
 
             for query_pos, ref_pos, ref_base in read.get_aligned_pairs(
@@ -114,6 +114,11 @@ def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_t
                 ref_up = ref_base.upper()
                 qry_up = read.query_sequence[query_pos].upper()
 
+                # Count T positions above quality threshold (strand-aware), matches and mismatches alike
+                if (read.flag in PLUS_FLAGS and ref_up == 'T') or \
+                   (read.flag in MINUS_FLAGS and ref_up == 'A'):
+                    total_t_positions += 1
+
                 # Skip exact matches
                 if qry_up == ref_up:
                     continue
@@ -121,8 +126,6 @@ def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_t
                 # SNP filter (ref_pos is 0-based; VCF positions are 1-based)
                 if snp_set and (chrom, ref_pos + 1, ref_up, qry_up) in snp_set:
                     continue
-
-                total_mismatches += 1
 
                 # T→C signature (strand-aware)
                 if read.flag in PLUS_FLAGS:
@@ -132,13 +135,13 @@ def filter_nascent_reads(input_bam, output_bam, snp_vcf, min_base_quality, min_t
                     if ref_up == 'A' and qry_up == 'G':
                         tc_mismatches += 1
 
-            # Reads with no mismatches cannot have a T→C ratio
-            if total_mismatches == 0:
+            # Reads with no T positions above threshold cannot have a T→C ratio
+            if total_t_positions == 0:
                 counters['no_mismatches'] += 1
                 continue
 
-            tc_ratio = tc_mismatches / total_mismatches
-            if tc_ratio >= min_tc_ratio:
+            tc_ratio = tc_mismatches / total_t_positions
+            if tc_mismatches >= min_tc_count and tc_ratio >= min_tc_ratio:
                 nascent_qnames.add(read.query_name)
                 counters['nascent_reads_classified'] += 1
             else:
@@ -192,6 +195,7 @@ def main(args):
         snp_vcf         = args.snp_vcf,
         min_base_quality= args.min_base_quality,
         min_tc_ratio    = args.min_tc_ratio,
+        min_tc_count    = args.min_tc_count,
         num_processes   = args.num_processes,
     )
 
