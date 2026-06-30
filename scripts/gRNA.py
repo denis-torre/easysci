@@ -241,87 +241,6 @@ def count_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcod
     _write_outputs(umi_dict, read_counter, min_umi_threshold, output_dir, sample_name)
 
 
-def count_grna_reads_autodiscovery(r1_file, r2_file, r3_file, ligation_barcode_file,
-                                    RT_barcode_file, inner_i7_barcode_file,
-                                    output_dir, sample_name,
-                                    sgrna_annotation_file=None,
-                                    min_umi_threshold=10, min_sgrna_count=10,
-                                    n_reads=None):
-
-    print("Loading barcodes...", flush=True)
-    ligation_barcodes, RT_barcodes, inner_i7_barcodes = _load_barcodes(
-        ligation_barcode_file, RT_barcode_file, inner_i7_barcode_file)
-
-    sgrna_annotation = {}
-    if sgrna_annotation_file:
-        annot_df = pd.read_table(sgrna_annotation_file)
-        sgrna_annotation = dict(zip(annot_df['gRNA_seq'], annot_df['names']))
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    ### Pass 1 — discover sgRNA sequences
-    print("Pass 1: discovering sgRNA sequences...", flush=True)
-    sgrna_seq_counts = {}
-    start_time = time.time()
-
-    handles = [gzip.open(f, "rt") for f in [r1_file, r2_file, r3_file]]
-    try:
-        readers = [SeqIO.parse(h, "fastq") for h in handles]
-        for read_count, (r1, r2, r3) in enumerate(zip(*readers), 1):
-
-            if n_reads and read_count > n_reads:
-                break
-
-            if read_count % 500000 == 0:
-                elapsed = str(timedelta(seconds=int(time.time() - start_time)))
-                print(f"  Pass 1: read {read_count:,}... ({elapsed} elapsed)", flush=True)
-                start_time = time.time()
-
-            if str(r1[18:28].seq) not in CONSTANT1_VARIANTS or str(r2[10:20].seq) not in CONSTANT2_VARIANTS:
-                continue
-            if not ligation_barcodes.get(str(r3[0:10].seq)):
-                continue
-            if not inner_i7_barcodes.get(str(r2[0:10].seq)):
-                continue
-            if not RT_barcodes.get(str(r1[8:18].seq)):
-                continue
-
-            sgrna_seq = str(r2[35:55].seq)
-            sgrna_seq_counts[sgrna_seq] = sgrna_seq_counts.get(sgrna_seq, 0) + 1
-    finally:
-        for h in handles:
-            h.close()
-
-    whitelist = {seq for seq, n in sgrna_seq_counts.items() if n >= min_sgrna_count}
-    print(f"  {len(sgrna_seq_counts):,} unique sequences; "
-          f"{len(whitelist):,} whitelisted (>= {min_sgrna_count} reads).", flush=True)
-
-    whitelist_rows = [
-        {'sgrna_seq': seq, 'read_count': sgrna_seq_counts[seq],
-         'sgrna_name': sgrna_annotation.get(seq, seq)}
-        for seq in sorted(whitelist, key=lambda s: -sgrna_seq_counts[s])
-    ]
-    whitelist_file = os.path.join(output_dir, f"{sample_name}-sgrna_whitelist.tsv")
-    pd.DataFrame(whitelist_rows).to_csv(whitelist_file, sep='\t', index=False)
-
-    sgrna_correction = _build_correction_dict(whitelist)
-
-    ### Pass 2 — count UMIs using discovered whitelist
-    print("Pass 2: counting UMIs...", flush=True)
-    umi_dict, read_counter = _count_umi_loop(
-        r1_file, r2_file, r3_file,
-        sgrna_lookup=sgrna_correction,
-        ligation_barcodes=ligation_barcodes,
-        RT_barcodes=RT_barcodes,
-        inner_i7_barcodes=inner_i7_barcodes,
-        sgrna_annotation=sgrna_annotation,
-        sample_name=sample_name,
-        n_reads=n_reads,
-        progress_label="  Pass 2: read",
-    )
-
-    _write_outputs(umi_dict, read_counter, min_umi_threshold, output_dir, sample_name)
-
 def discover_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcode_file,
                          inner_i7_barcode_file, output_dir, sample_name, n_reads=None):
 
@@ -360,22 +279,6 @@ def main(args):
         output_dir=args.output_dir,
         sample_name=args.sample_name,
         min_umi_threshold=args.min_umi_threshold,
-        n_reads=getattr(args, 'n_reads', None),
-    )
-
-def main_autodiscovery(args):
-    count_grna_reads_autodiscovery(
-        r1_file=args.r1,
-        r2_file=args.r2,
-        r3_file=args.r3,
-        ligation_barcode_file=args.ligation_barcode_file,
-        RT_barcode_file=args.RT_barcode_file,
-        inner_i7_barcode_file=args.inner_i7_barcode_file,
-        sgrna_annotation_file=getattr(args, 'sgrna_annotation_file', None),
-        output_dir=args.output_dir,
-        sample_name=args.sample_name,
-        min_umi_threshold=args.min_umi_threshold,
-        min_sgrna_count=args.min_sgrna_count,
         n_reads=getattr(args, 'n_reads', None),
     )
 
