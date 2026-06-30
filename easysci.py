@@ -99,6 +99,18 @@ def run():
     grna_auto_parser.add_argument("--min_sgrna_count", type=int, required=False, default=10, help="Minimum reads a sequence must appear in (pass 1) to be whitelisted as a real sgRNA (default: 10).")
     grna_auto_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
 
+    # 9. Subparser for gRNA sequence discovery
+    grna_discover_parser = subparsers.add_parser('gRNA-discover', help='Single-pass discovery of every sgRNA-position sequence passing the barcode/constant-region filter chain — no whitelisting, no UMI counting.')
+    grna_discover_parser.add_argument("--r1", type=str, required=True, help="R1 FASTQ (UMI + RT barcode + constant region 1).")
+    grna_discover_parser.add_argument("--r2", type=str, required=True, help="R2 FASTQ (inner i7 barcode + constant region 2 + sgRNA sequence).")
+    grna_discover_parser.add_argument("--r3", type=str, required=True, help="R3 FASTQ (ligation barcode).")
+    grna_discover_parser.add_argument("--ligation_barcode_file", type=str, required=True, help="TSV of ligation barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_discover_parser.add_argument("--RT_barcode_file", type=str, required=True, help="TSV of RT barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_discover_parser.add_argument("--inner_i7_barcode_file", type=str, required=True, help="TSV of inner i7 barcodes (barcode_1bp_substitution / original_barcode).")
+    grna_discover_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
+    grna_discover_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files.")
+    grna_discover_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
+
     # Get args
     args = parser.parse_args()
 
@@ -118,6 +130,8 @@ def run():
         gRNA.main(args)
     elif args.command == 'gRNA-auto':
         gRNA.main_autodiscovery(args)
+    elif args.command == 'gRNA-discover':
+        gRNA.main_discover(args)
     else:
         parser.print_help()
 

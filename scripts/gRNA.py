@@ -117,6 +117,58 @@ def _count_umi_loop(r1_file, r2_file, r3_file, sgrna_lookup, ligation_barcodes,
     return umi_dict, read_counter
 
 
+def _count_sgrna_seqs_loop(r1_file, r2_file, r3_file, ligation_barcodes,
+                            RT_barcodes, inner_i7_barcodes, n_reads, progress_label):
+    sgrna_seq_counts = {}
+    read_counter = {
+        'filtered_constant_region': 0,
+        'filtered_ligation_barcode': 0,
+        'filtered_inner_i7': 0,
+        'filtered_RT_barcode': 0,
+        'passed': 0,
+    }
+    start_time = time.time()
+
+    handles = [gzip.open(f, "rt") for f in [r1_file, r2_file, r3_file]]
+    try:
+        readers = [SeqIO.parse(h, "fastq") for h in handles]
+        for read_count, (r1, r2, r3) in enumerate(zip(*readers), 1):
+
+            if n_reads and read_count > n_reads:
+                break
+
+            if read_count % 500000 == 0:
+                elapsed = str(timedelta(seconds=int(time.time() - start_time)))
+                print(f"{progress_label} {read_count:,}... ({elapsed} elapsed)", flush=True)
+                start_time = time.time()
+
+            if str(r1[18:28].seq) not in CONSTANT1_VARIANTS or str(r2[10:20].seq) not in CONSTANT2_VARIANTS:
+                read_counter['filtered_constant_region'] += 1
+                continue
+
+            if not ligation_barcodes.get(str(r3[0:10].seq)):
+                read_counter['filtered_ligation_barcode'] += 1
+                continue
+
+            if not inner_i7_barcodes.get(str(r2[0:10].seq)):
+                read_counter['filtered_inner_i7'] += 1
+                continue
+
+            if not RT_barcodes.get(str(r1[8:18].seq)):
+                read_counter['filtered_RT_barcode'] += 1
+                continue
+
+            sgrna_seq = str(r2[35:55].seq)
+            sgrna_seq_counts[sgrna_seq] = sgrna_seq_counts.get(sgrna_seq, 0) + 1
+            read_counter['passed'] += 1
+
+    finally:
+        for h in handles:
+            h.close()
+
+    return sgrna_seq_counts, read_counter
+
+
 def _write_outputs(umi_dict, read_counter, min_umi_threshold, output_dir, sample_name):
     print("Writing output files...", flush=True)
 
@@ -141,6 +193,36 @@ def _write_outputs(umi_dict, read_counter, min_umi_threshold, output_dir, sample
 
     print(f"Done. {read_counter['passed']:,} reads passed all filters. "
           f"Output: {count_file}", flush=True)
+
+
+def _write_discovery_outputs(sgrna_seq_counts, read_counter, output_dir, sample_name):
+    print("Writing output files...", flush=True)
+
+    total_reads_processed = sum(read_counter.values())
+    passed = read_counter['passed']
+
+    rows = [
+        {
+            'sgrna_seq': seq,
+            'read_count': count,
+            'percent_of_passed_reads': (count / passed * 100) if passed else 0.0,
+        }
+        for seq, count in sorted(sgrna_seq_counts.items(), key=lambda kv: -kv[1])
+    ]
+    discovery_dataframe = pd.DataFrame(rows, columns=['sgrna_seq', 'read_count', 'percent_of_passed_reads'])
+    discovery_file = os.path.join(output_dir, f"{sample_name}-sgrna_discovery.tsv")
+    discovery_dataframe.to_csv(discovery_file, sep='\t', index=False)
+
+    read_counter['total_reads_processed'] = total_reads_processed
+    summary_dataframe = pd.Series(read_counter).reset_index()
+    summary_dataframe.columns = ['read_class', 'count']
+    summary_dataframe['percent'] = summary_dataframe['count'] / total_reads_processed * 100
+    summary_file = os.path.join(output_dir, f"{sample_name}-sgrna_discovery_summary.tsv")
+    summary_dataframe.to_csv(summary_file, sep='\t', index=False)
+
+    print(f"Done. {len(sgrna_seq_counts):,} distinct sgRNA-position sequences found from "
+          f"{passed:,} passing reads (of {total_reads_processed:,} total). "
+          f"Output: {discovery_file}", flush=True)
 
 
 def count_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcode_file,
@@ -253,6 +335,27 @@ def count_grna_reads_autodiscovery(r1_file, r2_file, r3_file, ligation_barcode_f
 
     _write_outputs(umi_dict, read_counter, min_umi_threshold, output_dir, sample_name)
 
+def discover_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcode_file,
+                         inner_i7_barcode_file, output_dir, sample_name, n_reads=None):
+
+    print("Loading barcodes...", flush=True)
+    ligation_barcodes, RT_barcodes, inner_i7_barcodes = _load_barcodes(
+        ligation_barcode_file, RT_barcode_file, inner_i7_barcode_file)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    print("Processing FASTQ files (single-pass discovery, no UMI counting)...", flush=True)
+    sgrna_seq_counts, read_counter = _count_sgrna_seqs_loop(
+        r1_file, r2_file, r3_file,
+        ligation_barcodes=ligation_barcodes,
+        RT_barcodes=RT_barcodes,
+        inner_i7_barcodes=inner_i7_barcodes,
+        n_reads=n_reads,
+        progress_label="Processing read",
+    )
+
+    _write_discovery_outputs(sgrna_seq_counts, read_counter, output_dir, sample_name)
+
 #############################################
 ########## 3. Main
 #############################################
@@ -286,6 +389,19 @@ def main_autodiscovery(args):
         sample_name=args.sample_name,
         min_umi_threshold=args.min_umi_threshold,
         min_sgrna_count=args.min_sgrna_count,
+        n_reads=getattr(args, 'n_reads', None),
+    )
+
+def main_discover(args):
+    discover_grna_reads(
+        r1_file=args.r1,
+        r2_file=args.r2,
+        r3_file=args.r3,
+        ligation_barcode_file=args.ligation_barcode_file,
+        RT_barcode_file=args.RT_barcode_file,
+        inner_i7_barcode_file=args.inner_i7_barcode_file,
+        output_dir=args.output_dir,
+        sample_name=args.sample_name,
         n_reads=getattr(args, 'n_reads', None),
     )
 
