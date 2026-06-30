@@ -81,7 +81,7 @@ def run():
     grna_parser.add_argument("--sgrna_annotation_file", type=str, required=False, default=None, help="Optional TSV mapping sgRNA sequences to names (gRNA_seq / names). If omitted, raw sequences are used as identifiers.")
     grna_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
     grna_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
-    grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
+    grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=1, help="Minimum total sgRNA UMIs per cell to retain (default: 1).")
     grna_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
 
     # 8. Subparser for gRNA sequence discovery

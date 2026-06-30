@@ -211,7 +211,7 @@ def _write_discovery_outputs(sgrna_seq_counts, read_counter, output_dir, sample_
 
 def count_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcode_file,
                      inner_i7_barcode_file, sgrna_barcode_file, output_dir, sample_name,
-                     sgrna_annotation_file=None, min_umi_threshold=10, n_reads=None):
+                     sgrna_annotation_file=None, min_umi_threshold=1, n_reads=None):
 
     print("Loading barcodes...", flush=True)
     ligation_barcodes, RT_barcodes, inner_i7_barcodes = _load_barcodes(
