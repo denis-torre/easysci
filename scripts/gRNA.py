@@ -29,6 +29,12 @@ def _load_barcode_dict(tsv_file):
     return {row['barcode_1bp_substitution']: row['original_barcode'] for _, row in df.iterrows()}
 
 
+def _load_inner_i7_barcode_dict(tsv_file):
+    """Load inner i7 barcodes from sample_id/barcode format TSV, building 1bp correction dict on the fly."""
+    df = pd.read_table(tsv_file)
+    return _build_correction_dict(df['barcode'].tolist())
+
+
 def _build_correction_dict(whitelist):
     correction = {}
     for seq in whitelist:
@@ -49,7 +55,7 @@ def count_grna_reads(r1_file, r2_file, r3_file, ligation_barcode_file, RT_barcod
 
     ligation_barcodes = _load_barcode_dict(ligation_barcode_file)
     RT_barcodes = _load_barcode_dict(RT_barcode_file)
-    inner_i7_barcodes = _load_barcode_dict(inner_i7_barcode_file)
+    inner_i7_barcodes = _load_inner_i7_barcode_dict(inner_i7_barcode_file)
     sgrna_barcodes = _load_barcode_dict(sgrna_barcode_file)
 
     annot_df = pd.read_table(sgrna_annotation_file)
@@ -157,7 +163,7 @@ def count_grna_reads_autodiscovery(r1_file, r2_file, r3_file, ligation_barcode_f
     print("Loading barcodes...", flush=True)
     ligation_barcodes = _load_barcode_dict(ligation_barcode_file)
     RT_barcodes = _load_barcode_dict(RT_barcode_file)
-    inner_i7_barcodes = _load_barcode_dict(inner_i7_barcode_file)
+    inner_i7_barcodes = _load_inner_i7_barcode_dict(inner_i7_barcode_file)
 
     sgrna_annotation = {}
     if sgrna_annotation_file:
