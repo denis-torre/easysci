@@ -82,6 +82,7 @@ def run():
     grna_parser.add_argument("--output_dir", type=str, required=True, help="Output directory.")
     grna_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
     grna_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
+    grna_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
 
     # 8. Subparser for gRNA counting with auto-discovery
     grna_auto_parser = subparsers.add_parser('gRNA-auto', help='Count sgRNA UMIs per cell, discovering sgRNA sequences from the data (no reference barcode file required).')
@@ -96,6 +97,7 @@ def run():
     grna_auto_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files and cell IDs.")
     grna_auto_parser.add_argument("--min_umi_threshold", type=int, required=False, default=10, help="Minimum total sgRNA UMIs per cell to retain (default: 10).")
     grna_auto_parser.add_argument("--min_sgrna_count", type=int, required=False, default=10, help="Minimum reads a sequence must appear in (pass 1) to be whitelisted as a real sgRNA (default: 10).")
+    grna_auto_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
 
     # Get args
     args = parser.parse_args()
