@@ -9,16 +9,11 @@ import pandas as pd
 import argparse
 from Bio import SeqIO
 
+from barcode_correction import _mismatch_variants, _build_correction_dict
+
 #############################################
 ########## 2. Processing functions
 #############################################
-
-def _mismatch_variants(seq):
-    variants = set()
-    for pos in range(len(seq)):
-        for base in 'ACGTN':
-            variants.add(seq[:pos] + base + seq[pos+1:])
-    return variants
 
 CONSTANT1_VARIANTS = _mismatch_variants("CAAGTTGATA")  # R1[18:28]
 CONSTANT2_VARIANTS = _mismatch_variants("ATCTTGTGGA")  # R2[10:20]
@@ -33,17 +28,6 @@ def _load_inner_i7_barcode_dict(tsv_file):
     """Load inner i7 barcodes from sample_id/barcode format TSV, building 1bp correction dict on the fly."""
     df = pd.read_table(tsv_file)
     return _build_correction_dict(df['barcode'].tolist())
-
-
-def _build_correction_dict(whitelist):
-    correction = {}
-    for seq in whitelist:
-        for variant in _mismatch_variants(seq):
-            if variant in correction:
-                correction[variant] = None  # ambiguous — two whitelist seqs within distance 2
-            else:
-                correction[variant] = seq
-    return {k: v for k, v in correction.items() if v is not None}
 
 
 def _load_barcodes(ligation_barcode_file, RT_barcode_file, inner_i7_barcode_file):

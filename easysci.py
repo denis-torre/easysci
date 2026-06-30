@@ -7,7 +7,7 @@ import argparse
 
 # Custom
 sys.path.append(os.path.join(os.path.dirname(__file__), "scripts"))
-from scripts import barcode, tag, index, count, merge, slam, gRNA
+from scripts import barcode, tag, index, count, merge, slam, gRNA, barcode_correction
 # from scripts import count, index
 
 #############################################
@@ -111,6 +111,12 @@ def run():
     grna_discover_parser.add_argument("--sample_name", type=str, required=True, help="Sample name prefix for output files.")
     grna_discover_parser.add_argument("--n_reads", type=int, required=False, default=None, help="If set, process only the first N reads (useful for testing).")
 
+    # 10. Subparser for building a 1bp-mismatch correction dict from a barcode whitelist
+    correction_parser = subparsers.add_parser('build-correction-dict', help='Build a barcode_1bp_substitution/original_barcode correction TSV from a plain barcode whitelist (for use as --sgrna_barcode_file, --ligation_barcode_file, etc).')
+    correction_parser.add_argument("--input_file", type=str, required=True, help="TSV containing a column of whitelist barcode/sgRNA sequences.")
+    correction_parser.add_argument("--sequence_column", type=str, required=True, help="Name of the column in --input_file containing the sequences to expand.")
+    correction_parser.add_argument("--output_file", type=str, required=True, help="Output TSV path (columns: barcode_1bp_substitution, original_barcode).")
+
     # Get args
     args = parser.parse_args()
 
@@ -132,6 +138,8 @@ def run():
         gRNA.main_autodiscovery(args)
     elif args.command == 'gRNA-discover':
         gRNA.main_discover(args)
+    elif args.command == 'build-correction-dict':
+        barcode_correction.main(args)
     else:
         parser.print_help()
 
